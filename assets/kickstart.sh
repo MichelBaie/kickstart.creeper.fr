@@ -71,7 +71,6 @@ check_root() {
   fi
 }
 
-# Pose une question oui/non avec un comportement par défaut.
 ask_yes_no() {
   local prompt="$1"
   local default="$2"  # "yes" ou "no"
@@ -86,7 +85,6 @@ ask_yes_no() {
   while true; do
     read -r -p "$prompt $default_label : " REPLY < /dev/tty
     if [[ -z "$REPLY" ]]; then
-      # Enter => valeur par défaut
       if [[ "$default" == "yes" ]]; then
         return 0
       else
@@ -174,7 +172,6 @@ install_ssh_keys() {
   chmod 700 /root/.ssh
   chmod 600 /root/.ssh/authorized_keys
 
-  # Forcer l’authentification par clé pour root
   local SSHD_CONFIG="/etc/ssh/sshd_config"
   if grep -qE "^PermitRootLogin" "$SSHD_CONFIG"; then
     sed -i 's/^PermitRootLogin.*/PermitRootLogin prohibit-password/' "$SSHD_CONFIG"
@@ -226,7 +223,6 @@ create_user_app() {
   local password="$1"
   echo "==> Création de l'utilisateur 'app'..." > /dev/tty
 
-  # Vérifie si l'utilisateur existe déjà
   if id "app" &>/dev/null; then
     echo "L'utilisateur 'app' existe déjà. Mise à jour du mot de passe..." > /dev/tty
   else
@@ -234,10 +230,8 @@ create_user_app() {
     useradd -m -s /bin/bash app
   fi
 
-  # Mettre à jour le mot de passe
   echo "app:$password" | chpasswd
 
-  # Si Docker est installé, ajouter 'app' au groupe docker
   if command -v docker &> /dev/null; then
     echo "Docker est installé. Ajout de 'app' au groupe 'docker'." > /dev/tty
     usermod -aG docker app
@@ -274,7 +268,6 @@ install_qemu_tools() {
 }
 
 deploy_watchtower() {
-
   echo "==> Déploiement de Watchtower (Docker)..." > /dev/tty
 
   local APP_HOME
@@ -283,7 +276,6 @@ deploy_watchtower() {
   local WATCHTOWER_DIR="${APP_HOME}/WatchTower"
   mkdir -p "$WATCHTOWER_DIR"
 
-  # Création du fichier docker-compose.yml
   cat <<EOF > "${WATCHTOWER_DIR}/docker-compose.yml"
 services:
   watchtower:
@@ -303,7 +295,6 @@ EOF
   chown -R app:app "$WATCHTOWER_DIR"
 
   # Lancer le conteneur via docker compose
-  # On exécute la commande en se basant sur un "sudo -u app" pour rester cohérent
   sudo -u app bash -c "cd '$WATCHTOWER_DIR' && docker compose up -d"
 
   echo "==> Watchtower déployé dans ${WATCHTOWER_DIR}." > /dev/tty
@@ -352,7 +343,6 @@ else
   CHOICE_WIREGUARD="no"
 fi
 
-# Question utilisateur 'app'
 APP_PASS=""
 if ask_yes_no "6. Créer l'utilisateur 'app' et définir son mot de passe ?" "no"; then
   CHOICE_USER="yes"
@@ -379,6 +369,13 @@ if ask_yes_no "9. Installer Qemu Guest Tools ?" "no"; then
   CHOICE_QEMU="yes"
 else
   CHOICE_QEMU="no"
+fi
+
+CHOICE_WATCHTOWER="no"
+if [[ "$CHOICE_DOCKER" == "yes" && "$CHOICE_USER" == "yes" ]]; then
+  if ask_yes_no "10. Déployer Watchtower (pour surveiller et mettre à jour les containers) ?" "no"; then
+    CHOICE_WATCHTOWER="yes"
+  fi
 fi
 
 echo "-------------------------------------------------" > /dev/tty
@@ -422,8 +419,7 @@ if [[ "$CHOICE_QEMU" == "yes" ]]; then
   install_qemu_tools
 fi
 
-# Déploiement automatique de Watchtower si Docker et user 'app' sont installés
-if [[ "$CHOICE_DOCKER" == "yes" && "$CHOICE_USER" == "yes" ]]; then
+if [[ "$CHOICE_WATCHTOWER" == "yes" ]]; then
   deploy_watchtower
 fi
 
