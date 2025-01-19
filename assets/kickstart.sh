@@ -43,6 +43,26 @@ WIREGUARD_PACKAGES=(
   "resolvconf"
 )
 
+# VirtualBox Guest Tools
+VIRTUALBOX_PACKAGES=(
+  "make"
+  "gcc"
+  "dkms"
+  "linux-source"
+  "linux-headers-amd64"
+)
+
+# VMware Guest Tools
+VMWARE_PACKAGES=(
+  "open-vm-tools-desktop"
+)
+
+# Qemu Guest Tools
+QEMU_PACKAGES=(
+  "qemu-guest-agent"
+  "spice-vdagent"
+)
+
 # URL de la clé publique à installer
 SSH_KEY_URL="https://identity.creeper.fr/assets/creeper.fr.pub.authorized_keys"
 
@@ -74,7 +94,7 @@ ask_yes_no() {
   fi
 
   while true; do
-    # On lit depuis /dev/tty pour garantir l'interactivité
+    # On lit depuis /dev/tty pour garantir l'interactivité même si script via pipe
     read -r -p "$prompt $default_label : " REPLY < /dev/tty
 
     # Si l'utilisateur n'a rien saisi, on prend la valeur par défaut
@@ -136,8 +156,8 @@ install_apt_packages() {
   echo "==> Installation de unattended-upgrades..." > /dev/tty
   $PKG_MANAGER install -y unattended-upgrades
 
-  echo "==> Activation d'unattended-upgrades (dpkg-reconfigure)..." > /dev/tty
-  dpkg-reconfigure unattended-upgrades
+  echo "==> Activation d'unattended-upgrades (dpkg-reconfigure -pmedium)..." > /dev/tty
+  dpkg-reconfigure -pmedium unattended-upgrades
 
   echo "==> APT : Mise à jour et installation terminées." > /dev/tty
   echo > /dev/tty
@@ -217,6 +237,59 @@ install_wireguard() {
   echo > /dev/tty
 }
 
+create_user_app() {
+  echo "==> Création de l'utilisateur 'app'..." > /dev/tty
+
+  # Demande du mot de passe
+  echo -n "Entrez le mot de passe pour l'utilisateur 'app': " > /dev/tty
+  read -r -s APP_PASS < /dev/tty  # -s : pas d'affichage
+  echo > /dev/tty   # saut de ligne
+
+  # Vérifie si l'utilisateur existe déjà
+  if id "app" &>/dev/null; then
+    echo "L'utilisateur 'app' existe déjà. Mise à jour du mot de passe..." > /dev/tty
+  else
+    echo "Création de l'utilisateur 'app'..." > /dev/tty
+    useradd -m -s /bin/bash app
+  fi
+
+  # Mettre à jour le mot de passe
+  echo "app:$APP_PASS" | chpasswd
+
+  # Vérifie si Docker est installé : si oui, on ajoute l'utilisateur au groupe docker
+  if command -v docker &> /dev/null; then
+    echo "Docker est installé. Ajout de 'app' au groupe 'docker'." > /dev/tty
+    usermod -aG docker app
+  fi
+
+  echo "==> Utilisateur 'app' configuré." > /dev/tty
+  echo > /dev/tty
+}
+
+install_virtualbox_tools() {
+  echo "==> Installation des VirtualBox Guest Tools (préparation)..." > /dev/tty
+  $PKG_MANAGER update
+  $PKG_MANAGER install -y "${VIRTUALBOX_PACKAGES[@]}"
+  echo "==> VirtualBox Guest Tools installés (préparation)." > /dev/tty
+  echo > /dev/tty
+}
+
+install_vmware_tools() {
+  echo "==> Installation des VMWare Guest Tools..." > /dev/tty
+  $PKG_MANAGER update
+  $PKG_MANAGER install -y "${VMWARE_PACKAGES[@]}"
+  echo "==> VMWare Guest Tools installés." > /dev/tty
+  echo > /dev/tty
+}
+
+install_qemu_tools() {
+  echo "==> Installation des Qemu Guest Tools..." > /dev/tty
+  $PKG_MANAGER update
+  $PKG_MANAGER install -y "${QEMU_PACKAGES[@]}"
+  echo "==> Qemu Guest Tools installés." > /dev/tty
+  echo > /dev/tty
+}
+
 ########################################
 #             PROGRAMME MAIN           #
 ########################################
@@ -228,6 +301,8 @@ echo "Script d'installation de base pour Debian/Ubuntu." > /dev/tty
 echo "-------------------------------------------------" > /dev/tty
 
 # 1) Pose toutes les questions au début
+# (APT et SSH => yes par défaut ; le reste => no par défaut)
+
 if ask_yes_no "1. Mettre à jour le système et installer les paquets de base ?" "yes"; then
   CHOICE_APT="yes"
 else
@@ -240,7 +315,6 @@ else
   CHOICE_SSH="no"
 fi
 
-# Par défaut = no pour Docker, CrowdSec, WireGuard
 if ask_yes_no "3. Installer Docker (si non déjà installé) ?" "no"; then
   CHOICE_DOCKER="yes"
 else
@@ -257,6 +331,30 @@ if ask_yes_no "5. Installer WireGuard ?" "no"; then
   CHOICE_WIREGUARD="yes"
 else
   CHOICE_WIREGUARD="no"
+fi
+
+if ask_yes_no "6. Créer l'utilisateur 'app' et définir son mot de passe ?" "no"; then
+  CHOICE_USER="yes"
+else
+  CHOICE_USER="no"
+fi
+
+if ask_yes_no "7. Installer VirtualBox Guest Tools (make gcc dkms etc.) ?" "no"; then
+  CHOICE_VBOX="yes"
+else
+  CHOICE_VBOX="no"
+fi
+
+if ask_yes_no "8. Installer VMware Guest Tools (open-vm-tools-desktop) ?" "no"; then
+  CHOICE_VMWARE="yes"
+else
+  CHOICE_VMWARE="no"
+fi
+
+if ask_yes_no "9. Installer Qemu Guest Tools (qemu-guest-agent spice-vdagent) ?" "no"; then
+  CHOICE_QEMU="yes"
+else
+  CHOICE_QEMU="no"
 fi
 
 echo "-------------------------------------------------" > /dev/tty
@@ -282,6 +380,22 @@ fi
 
 if [[ "$CHOICE_WIREGUARD" == "yes" ]]; then
   install_wireguard
+fi
+
+if [[ "$CHOICE_USER" == "yes" ]]; then
+  create_user_app
+fi
+
+if [[ "$CHOICE_VBOX" == "yes" ]]; then
+  install_virtualbox_tools
+fi
+
+if [[ "$CHOICE_VMWARE" == "yes" ]]; then
+  install_vmware_tools
+fi
+
+if [[ "$CHOICE_QEMU" == "yes" ]]; then
+  install_qemu_tools
 fi
 
 echo "-------------------------------------------------" > /dev/tty
