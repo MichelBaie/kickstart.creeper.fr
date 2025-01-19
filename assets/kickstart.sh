@@ -50,6 +50,16 @@ detect_package_manager() {
   fi
 }
 
+# On sépare WireGuard en deux groupes pour éviter de casser le DNS
+WIREGUARD_PRE=(
+  "wireguard-tools"
+  "iptables"
+)
+
+WIREGUARD_POST=(
+  "resolvconf"
+)
+
 BASE_PACKAGES=(
   "htop"
   "nload"
@@ -66,12 +76,6 @@ BASE_PACKAGES=(
   "mtr-tiny"
   "whois"
   "nano"
-)
-
-WIREGUARD_PACKAGES=(
-  "wireguard-tools"
-  "resolvconf"
-  "iptables"
 )
 
 VIRTUALBOX_PACKAGES=(
@@ -247,11 +251,21 @@ install_crowdsec() {
   echo > /dev/tty
 }
 
-install_wireguard() {
-  echo -e "${GREEN}==> Installation de WireGuard... 🔒${RESET}" > /dev/tty
+# Première partie de WireGuard (installation de wireguard-tools et iptables)
+install_wireguard_part1() {
+  echo -e "${GREEN}==> Installation de WireGuard (partie 1 : tools/iptables)... 🔒${RESET}" > /dev/tty
   $PKG_MANAGER update
-  $PKG_MANAGER install -y --no-install-recommends "${WIREGUARD_PACKAGES[@]}"
-  echo -e "${GREEN}==> WireGuard est installé.${RESET}" > /dev/tty
+  $PKG_MANAGER install -y --no-install-recommends "${WIREGUARD_PRE[@]}"
+  echo -e "${GREEN}==> WireGuard (partie 1) est installé.${RESET}" > /dev/tty
+  echo > /dev/tty
+}
+
+# Seconde partie de WireGuard (resolvconf) à la fin du script
+install_wireguard_part2() {
+  echo -e "${GREEN}==> Installation de resolvconf (WireGuard part 2)...${RESET}" > /dev/tty
+  $PKG_MANAGER update
+  $PKG_MANAGER install -y resolvconf
+  echo -e "${GREEN}==> resolvconf est installé.${RESET}" > /dev/tty
   echo > /dev/tty
 }
 
@@ -372,7 +386,8 @@ else
   CHOICE_CROWDSEC="no"
 fi
 
-if ask_yes_no "5. Installer WireGuard ?" "no"; then
+# On va d'abord installer la PARTIE 1 de WireGuard (sans resolvconf)
+if ask_yes_no "5. Installer WireGuard ? (Sans resolvconf au début)" "no"; then
   CHOICE_WIREGUARD="yes"
 else
   CHOICE_WIREGUARD="no"
@@ -434,8 +449,9 @@ if [[ "$CHOICE_CROWDSEC" == "yes" ]]; then
   install_crowdsec
 fi
 
+# WireGuard - partie 1 (sans resolvconf)
 if [[ "$CHOICE_WIREGUARD" == "yes" ]]; then
-  install_wireguard
+  install_wireguard_part1
 fi
 
 if [[ "$CHOICE_USER" == "yes" ]]; then
@@ -456,6 +472,20 @@ fi
 
 if [[ "$CHOICE_WATCHTOWER" == "yes" ]]; then
   deploy_watchtower
+fi
+
+# FIN DU SCRIPT : si WireGuard = yes, on installe resolvconf
+if [[ "$CHOICE_WIREGUARD" == "yes" ]]; then
+  install_wireguard_part2
+fi
+
+# Enfin, on propose de redémarrer la machine
+echo -e "${CYAN}-------------------------------------------------${RESET}" > /dev/tty
+if ask_yes_no "Souhaitez-vous redémarrer la machine maintenant ?" "no"; then
+  echo -e "${YELLOW}Redémarrage en cours...${RESET}" > /dev/tty
+  reboot
+else
+  echo -e "${GREEN}Aucun redémarrage ne sera effectué.${RESET}" > /dev/tty
 fi
 
 echo -e "${GREEN}-------------------------------------------------${RESET}" > /dev/tty
