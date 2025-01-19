@@ -3,7 +3,6 @@
 #
 # Script d'initialisation ("kickstart") pour une base Debian/Ubuntu.
 # Auteur : Creeper
-# Date   : 2025-01-19
 #
 
 ########################################
@@ -21,7 +20,6 @@ detect_package_manager() {
   fi
 }
 
-# Paquets de base
 BASE_PACKAGES=(
   "htop"
   "nload"
@@ -36,13 +34,12 @@ BASE_PACKAGES=(
   "unzip"
 )
 
-# WireGuard
 WIREGUARD_PACKAGES=(
   "wireguard-tools"
   "resolvconf"
+  "iptables"
 )
 
-# VirtualBox Guest Tools
 VIRTUALBOX_PACKAGES=(
   "make"
   "gcc"
@@ -51,12 +48,10 @@ VIRTUALBOX_PACKAGES=(
   "linux-headers-amd64"
 )
 
-# VMware Guest Tools
 VMWARE_PACKAGES=(
   "open-vm-tools-desktop"
 )
 
-# Qemu Guest Tools
 QEMU_PACKAGES=(
   "qemu-guest-agent"
   "spice-vdagent"
@@ -146,15 +141,15 @@ install_apt_packages() {
   echo "==> Installation de unattended-upgrades..." > /dev/tty
   $PKG_MANAGER install -y unattended-upgrades
 
-  echo "==> Activation d'unattended-upgrades (dpkg-reconfigure -pmedium)..." > /dev/tty
+  echo "==> Activation des unattended-upgrades..." > /dev/tty
   dpkg-reconfigure -pmedium unattended-upgrades
 
-  echo "==> APT : Mise à jour et installation terminées." > /dev/tty
+  echo "==> APT : Mises à jour et installation terminées." > /dev/tty
   echo > /dev/tty
 }
 
 install_ssh_keys() {
-  echo "==> Installation/Configuration des clés SSH..." > /dev/tty
+  echo "==> Installation des clés SSH..." > /dev/tty
   local TEMP_KEY_FILE="/tmp/creeperfr_authorized_key"
 
   curl -sSL "$SSH_KEY_URL" -o "$TEMP_KEY_FILE"
@@ -200,7 +195,7 @@ install_docker() {
     return
   fi
 
-  echo "==> Installation de Docker (stable channel)..." > /dev/tty
+  echo "==> Installation de Docker..." > /dev/tty
   curl -sSL https://get.docker.com/ | CHANNEL=stable bash
   echo "==> Docker est installé." > /dev/tty
   echo > /dev/tty
@@ -252,7 +247,7 @@ create_user_app() {
 }
 
 install_virtualbox_tools() {
-  echo "==> Installation des VirtualBox Guest Tools (préparation)..." > /dev/tty
+  echo "==> Installation des paquets nécessaires à VirtualBox Guest Tools ..." > /dev/tty
   $PKG_MANAGER update
   $PKG_MANAGER install -y "${VIRTUALBOX_PACKAGES[@]}"
   echo "==> VirtualBox Guest Tools installés (préparation)." > /dev/tty
@@ -298,7 +293,7 @@ else
   CHOICE_SSH="no"
 fi
 
-if ask_yes_no "3. Installer Docker (si non déjà installé) ?" "no"; then
+if ask_yes_no "3. Installer Docker ?" "no"; then
   CHOICE_DOCKER="yes"
 else
   CHOICE_DOCKER="no"
@@ -327,19 +322,19 @@ else
   CHOICE_USER="no"
 fi
 
-if ask_yes_no "7. Installer VirtualBox Guest Tools (make gcc dkms etc.) ?" "no"; then
+if ask_yes_no "7. Installer les paquets nécéssaires à VirtualBox Guest Tools ?" "no"; then
   CHOICE_VBOX="yes"
 else
   CHOICE_VBOX="no"
 fi
 
-if ask_yes_no "8. Installer VMware Guest Tools (open-vm-tools-desktop) ?" "no"; then
+if ask_yes_no "8. Installer VMware Guest Tools ?" "no"; then
   CHOICE_VMWARE="yes"
 else
   CHOICE_VMWARE="no"
 fi
 
-if ask_yes_no "9. Installer Qemu Guest Tools (qemu-guest-agent spice-vdagent) ?" "no"; then
+if ask_yes_no "9. Installer Qemu Guest Tools ?" "no"; then
   CHOICE_QEMU="yes"
 else
   CHOICE_QEMU="no"
