@@ -32,6 +32,7 @@ BASE_PACKAGES=(
   "wget"
   "zip"
   "unzip"
+  "rsync"
 )
 
 WIREGUARD_PACKAGES=(
@@ -247,7 +248,7 @@ create_user_app() {
 }
 
 install_virtualbox_tools() {
-  echo "==> Installation des paquets nécessaires à VirtualBox Guest Tools ..." > /dev/tty
+  echo "==> Installation des paquets nécessaires à VirtualBox Guest Tools..." > /dev/tty
   $PKG_MANAGER update
   $PKG_MANAGER install -y "${VIRTUALBOX_PACKAGES[@]}"
   echo "==> VirtualBox Guest Tools installés (préparation)." > /dev/tty
@@ -266,9 +267,49 @@ install_qemu_tools() {
   echo "==> Installation des Qemu Guest Tools..." > /dev/tty
   $PKG_MANAGER update
   $PKG_MANAGER install -y "${QEMU_PACKAGES[@]}"
-  echo "==> Qemu Guest Tools installés." > /dev/tty
+  systemctl enable spice-vdagent
+
+  echo "==> Qemu Guest Tools installés et spice-vdagent activé." > /dev/tty
   echo > /dev/tty
 }
+
+deploy_watchtower() {
+
+  echo "==> Déploiement de Watchtower (Docker)..." > /dev/tty
+
+  local APP_HOME
+  APP_HOME="$(eval echo ~app)"
+
+  local WATCHTOWER_DIR="${APP_HOME}/WatchTower"
+  mkdir -p "$WATCHTOWER_DIR"
+
+  # Création du fichier docker-compose.yml
+  cat <<EOF > "${WATCHTOWER_DIR}/docker-compose.yml"
+services:
+  watchtower:
+    container_name: watchtower
+    image: containrrr/watchtower
+    volumes:
+      - '/var/run/docker.sock:/var/run/docker.sock'
+    restart: unless-stopped
+    environment:
+      - WATCHTOWER_CLEANUP=true
+      - WATCHTOWER_INCLUDE_RESTARTING=true
+      - WATCHTOWER_POLL_INTERVAL=3600
+      - WATCHTOWER_ROLLING_RESTART=true
+EOF
+
+  # Changer le propriétaire du répertoire pour 'app'
+  chown -R app:app "$WATCHTOWER_DIR"
+
+  # Lancer le conteneur via docker compose
+  # On exécute la commande en se basant sur un "sudo -u app" pour rester cohérent
+  sudo -u app bash -c "cd '$WATCHTOWER_DIR' && docker compose up -d"
+
+  echo "==> Watchtower déployé dans ${WATCHTOWER_DIR}." > /dev/tty
+  echo > /dev/tty
+}
+
 
 ########################################
 #             PROGRAMME MAIN           #
@@ -322,7 +363,7 @@ else
   CHOICE_USER="no"
 fi
 
-if ask_yes_no "7. Installer les paquets nécéssaires à VirtualBox Guest Tools ?" "no"; then
+if ask_yes_no "7. Installer les paquets nécessaires à VirtualBox Guest Tools ?" "no"; then
   CHOICE_VBOX="yes"
 else
   CHOICE_VBOX="no"
@@ -379,6 +420,11 @@ fi
 
 if [[ "$CHOICE_QEMU" == "yes" ]]; then
   install_qemu_tools
+fi
+
+# Déploiement automatique de Watchtower si Docker et user 'app' sont installés
+if [[ "$CHOICE_DOCKER" == "yes" && "$CHOICE_USER" == "yes" ]]; then
+  deploy_watchtower
 fi
 
 echo "-------------------------------------------------" > /dev/tty
