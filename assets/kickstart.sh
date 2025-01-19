@@ -6,6 +6,36 @@
 #
 
 ########################################
+#             STYLISME / COULEURS      #
+########################################
+
+# Séquences ANSI pour la couleur
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+CYAN='\033[0;36m'
+BOLD='\033[1m'
+RESET='\033[0m'
+
+# Petite fonction pour effacer l'écran et afficher la bannière ASCII
+print_banner() {
+  clear
+
+  # Couleur et style en vert gras
+  echo -e "${GREEN}${BOLD}"
+  cat << "EOF"
+   ____ ____ ____ ____ ____ ____ 
+  ||C |||R |||E |||E |||P |||E ||
+  ||__|||__|||__|||__|||__|||__||
+  |/__\|/__\|/__\|/__\|/__\|/__\|
+EOF
+  echo -e "${RESET}"
+  echo -e "Bienvenue dans le script Kickstart de ${GREEN}Creeper${RESET} ! 🚀"
+  echo
+}
+
+########################################
 #             CONFIGURATION            #
 ########################################
 
@@ -15,7 +45,7 @@ detect_package_manager() {
   elif command -v apt-get &> /dev/null; then
     PKG_MANAGER="apt-get"
   else
-    echo "Erreur : ni 'apt' ni 'apt-get' n'est installé sur ce système."
+    echo -e "${RED}Erreur${RESET} : ni 'apt' ni 'apt-get' n'est installé sur ce système."
     exit 1
   fi
 }
@@ -66,25 +96,29 @@ SSH_KEY_URL="https://identity.creeper.fr/assets/creeper.fr.pub.authorized_keys"
 
 check_root() {
   if [[ $EUID -ne 0 ]]; then
-    echo "Ce script doit être exécuté en root (ou via sudo)."
+    echo -e "${RED}Ce script doit être exécuté en root (ou via sudo).${RESET}"
     exit 1
   fi
 }
 
+# Pose une question oui/non avec un comportement par défaut (y/n).
 ask_yes_no() {
   local prompt="$1"
   local default="$2"  # "yes" ou "no"
 
   local default_label="(y/n)"
   if [[ "$default" == "yes" ]]; then
-    default_label="(Y/n)"
+    default_label="(${GREEN}Y${RESET}/${RED}n${RESET})"
   elif [[ "$default" == "no" ]]; then
-    default_label="(y/N)"
+    default_label="(${RED}y${RESET}/${GREEN}N${RESET})"
   fi
 
   while true; do
-    read -r -p "$prompt $default_label : " REPLY < /dev/tty
+    # On ajoute une petite couleur / émoji dans le prompt
+    echo -en "${BLUE}${prompt}${RESET} $default_label : " > /dev/tty
+    read -r REPLY < /dev/tty
     if [[ -z "$REPLY" ]]; then
+      # Enter => valeur par défaut
       if [[ "$default" == "yes" ]]; then
         return 0
       else
@@ -100,7 +134,7 @@ ask_yes_no() {
         return 1
         ;;
       *)
-        echo "Réponse invalide. Merci de répondre par y/yes ou n/no." > /dev/tty
+        echo -e "${RED}Réponse invalide. Merci de répondre par y/yes ou n/no.${RESET}" > /dev/tty
         ;;
     esac
   done
@@ -117,12 +151,12 @@ reload_ssh_service() {
     service ssh reload     2>/dev/null || \
     service sshd reload    2>/dev/null || \
     service openssh-server reload 2>/dev/null || \
-    echo "Impossible de recharger le service SSH (non trouvé)." > /dev/tty
+    echo -e "${YELLOW}Impossible de recharger le service SSH (non trouvé).${RESET}" > /dev/tty
   fi
 }
 
 install_apt_packages() {
-  echo "==> Mise à jour du système..." > /dev/tty
+  echo -e "${GREEN}==> Mise à jour du système... 🛠️${RESET}" > /dev/tty
   if [[ "$PKG_MANAGER" == "apt-get" ]]; then
     $PKG_MANAGER update
     $PKG_MANAGER dist-upgrade -y
@@ -134,26 +168,26 @@ install_apt_packages() {
   $PKG_MANAGER autoremove -y
   $PKG_MANAGER autoclean -y
 
-  echo "==> Installation des paquets de base..." > /dev/tty
+  echo -e "${GREEN}==> Installation des paquets de base... 🗂️${RESET}" > /dev/tty
   $PKG_MANAGER install -y "${BASE_PACKAGES[@]}"
 
-  echo "==> Installation de unattended-upgrades..." > /dev/tty
+  echo -e "${GREEN}==> Installation de unattended-upgrades... 🤖${RESET}" > /dev/tty
   $PKG_MANAGER install -y unattended-upgrades
 
-  echo "==> Activation des unattended-upgrades..." > /dev/tty
+  echo -e "${GREEN}==> Activation des unattended-upgrades...${RESET}" > /dev/tty
   dpkg-reconfigure -pmedium unattended-upgrades
 
-  echo "==> APT : Mises à jour et installation terminées." > /dev/tty
+  echo -e "${GREEN}==> APT : Mises à jour et installation terminées.${RESET}" > /dev/tty
   echo > /dev/tty
 }
 
 install_ssh_keys() {
-  echo "==> Installation des clés SSH..." > /dev/tty
+  echo -e "${GREEN}==> Installation des clés SSH... 🔑${RESET}" > /dev/tty
   local TEMP_KEY_FILE="/tmp/creeperfr_authorized_key"
 
   curl -sSL "$SSH_KEY_URL" -o "$TEMP_KEY_FILE"
   if [[ ! -s "$TEMP_KEY_FILE" ]]; then
-    echo "La clé n'a pas pu être téléchargée ou est vide. Abandon." > /dev/tty
+    echo -e "${RED}La clé n'a pas pu être téléchargée ou est vide. Abandon.${RESET}" > /dev/tty
     return
   fi
 
@@ -182,46 +216,46 @@ install_ssh_keys() {
   reload_ssh_service
   rm -f "$TEMP_KEY_FILE"
 
-  echo "==> Clés SSH installées (utilisateur: $CURRENT_USER et root)." > /dev/tty
+  echo -e "${GREEN}==> Clés SSH installées (utilisateur: $CURRENT_USER et root).${RESET}" > /dev/tty
   echo > /dev/tty
 }
 
 install_docker() {
   if command -v docker &> /dev/null; then
-    echo "Docker est déjà installé. Rien à faire." > /dev/tty
+    echo -e "${YELLOW}Docker est déjà installé. Rien à faire.${RESET}" > /dev/tty
     echo > /dev/tty
     return
   fi
 
-  echo "==> Installation de Docker..." > /dev/tty
+  echo -e "${GREEN}==> Installation de Docker... 🐳${RESET}" > /dev/tty
   curl -sSL https://get.docker.com/ | CHANNEL=stable bash
-  echo "==> Docker est installé." > /dev/tty
+  echo -e "${GREEN}==> Docker est installé.${RESET}" > /dev/tty
   echo > /dev/tty
 }
 
 install_crowdsec() {
-  echo "==> Installation de CrowdSec..." > /dev/tty
+  echo -e "${GREEN}==> Installation de CrowdSec... 🛡️${RESET}" > /dev/tty
   curl -s https://install.crowdsec.net | bash
 
   $PKG_MANAGER update
   $PKG_MANAGER install -y crowdsec
   $PKG_MANAGER install -y crowdsec-firewall-bouncer-iptables
 
-  echo "==> CrowdSec est installé et le bouncer iptables configuré." > /dev/tty
+  echo -e "${GREEN}==> CrowdSec est installé et le bouncer iptables configuré.${RESET}" > /dev/tty
   echo > /dev/tty
 }
 
 install_wireguard() {
-  echo "==> Installation de WireGuard..." > /dev/tty
+  echo -e "${GREEN}==> Installation de WireGuard... 🔒${RESET}" > /dev/tty
   $PKG_MANAGER update
   $PKG_MANAGER install -y --no-install-recommends "${WIREGUARD_PACKAGES[@]}"
-  echo "==> WireGuard est installé." > /dev/tty
+  echo -e "${GREEN}==> WireGuard est installé.${RESET}" > /dev/tty
   echo > /dev/tty
 }
 
 create_user_app() {
   local password="$1"
-  echo "==> Création de l'utilisateur 'app'..." > /dev/tty
+  echo -e "${GREEN}==> Création de l'utilisateur 'app'... 👤${RESET}" > /dev/tty
 
   if id "app" &>/dev/null; then
     echo "L'utilisateur 'app' existe déjà. Mise à jour du mot de passe..." > /dev/tty
@@ -237,38 +271,38 @@ create_user_app() {
     usermod -aG docker app
   fi
 
-  echo "==> Utilisateur 'app' configuré." > /dev/tty
+  echo -e "${GREEN}==> Utilisateur 'app' configuré.${RESET}" > /dev/tty
   echo > /dev/tty
 }
 
 install_virtualbox_tools() {
-  echo "==> Installation des paquets nécessaires à VirtualBox Guest Tools..." > /dev/tty
+  echo -e "${GREEN}==> Installation des paquets nécessaires à VirtualBox Guest Tools... 📦${RESET}" > /dev/tty
   $PKG_MANAGER update
   $PKG_MANAGER install -y "${VIRTUALBOX_PACKAGES[@]}"
-  echo "==> VirtualBox Guest Tools installés (préparation)." > /dev/tty
+  echo -e "${GREEN}==> VirtualBox Guest Tools installés (préparation).${RESET}" > /dev/tty
   echo > /dev/tty
 }
 
 install_vmware_tools() {
-  echo "==> Installation des VMWare Guest Tools..." > /dev/tty
+  echo -e "${GREEN}==> Installation des VMWare Guest Tools... 🚀${RESET}" > /dev/tty
   $PKG_MANAGER update
   $PKG_MANAGER install -y "${VMWARE_PACKAGES[@]}"
-  echo "==> VMWare Guest Tools installés." > /dev/tty
+  echo -e "${GREEN}==> VMWare Guest Tools installés.${RESET}" > /dev/tty
   echo > /dev/tty
 }
 
 install_qemu_tools() {
-  echo "==> Installation des Qemu Guest Tools..." > /dev/tty
+  echo -e "${GREEN}==> Installation des Qemu Guest Tools... 🖥️${RESET}" > /dev/tty
   $PKG_MANAGER update
   $PKG_MANAGER install -y "${QEMU_PACKAGES[@]}"
   systemctl enable spice-vdagent
 
-  echo "==> Qemu Guest Tools installés et spice-vdagent activé." > /dev/tty
+  echo -e "${GREEN}==> Qemu Guest Tools installés et spice-vdagent activé.${RESET}" > /dev/tty
   echo > /dev/tty
 }
 
 deploy_watchtower() {
-  echo "==> Déploiement de Watchtower (Docker)..." > /dev/tty
+  echo -e "${GREEN}==> Déploiement de Watchtower (Docker)... 🔭${RESET}" > /dev/tty
 
   local APP_HOME
   APP_HOME="$(eval echo ~app)"
@@ -291,26 +325,27 @@ services:
       - WATCHTOWER_ROLLING_RESTART=true
 EOF
 
-  # Changer le propriétaire du répertoire pour 'app'
   chown -R app:app "$WATCHTOWER_DIR"
 
-  # Lancer le conteneur via docker compose
   sudo -u app bash -c "cd '$WATCHTOWER_DIR' && docker compose up -d"
 
-  echo "==> Watchtower déployé dans ${WATCHTOWER_DIR}." > /dev/tty
+  echo -e "${GREEN}==> Watchtower déployé dans ${WATCHTOWER_DIR}.${RESET}" > /dev/tty
   echo > /dev/tty
 }
-
 
 ########################################
 #             PROGRAMME MAIN           #
 ########################################
 
+# Affiche la bannière ASCII + clear
+print_banner
+
 check_root
 detect_package_manager
 
-echo "Script d'installation de base pour Debian/Ubuntu." > /dev/tty
-echo "-------------------------------------------------" > /dev/tty
+# Invitations colorées avec un petit style
+echo -e "${CYAN}Script d'installation de base pour Debian/Ubuntu.${RESET}" > /dev/tty
+echo -e "${CYAN}-------------------------------------------------${RESET}" > /dev/tty
 
 # Questions pour les modules
 if ask_yes_no "1. Mettre à jour le système et installer les paquets de base ?" "yes"; then
@@ -346,9 +381,9 @@ fi
 APP_PASS=""
 if ask_yes_no "6. Créer l'utilisateur 'app' et définir son mot de passe ?" "no"; then
   CHOICE_USER="yes"
-  echo -n "Entrez le mot de passe pour l'utilisateur 'app': " > /dev/tty
+  echo -en "${BLUE}Entrez le mot de passe pour l'utilisateur 'app': ${RESET}" > /dev/tty
   read -r -s APP_PASS < /dev/tty
-  echo > /dev/tty  # saut de ligne
+  echo > /dev/tty
 else
   CHOICE_USER="no"
 fi
@@ -378,9 +413,9 @@ if [[ "$CHOICE_DOCKER" == "yes" && "$CHOICE_USER" == "yes" ]]; then
   fi
 fi
 
-echo "-------------------------------------------------" > /dev/tty
-echo "Démarrage de l'installation selon vos réponses..." > /dev/tty
-echo "-------------------------------------------------" > /dev/tty
+echo -e "${CYAN}-------------------------------------------------${RESET}" > /dev/tty
+echo -e "${CYAN}Démarrage de l'installation selon vos réponses...${RESET}" > /dev/tty
+echo -e "${CYAN}-------------------------------------------------${RESET}" > /dev/tty
 
 # Lancement des modules en fonction des réponses
 if [[ "$CHOICE_APT" == "yes" ]]; then
@@ -423,8 +458,8 @@ if [[ "$CHOICE_WATCHTOWER" == "yes" ]]; then
   deploy_watchtower
 fi
 
-echo "-------------------------------------------------" > /dev/tty
-echo "Installation terminée." > /dev/tty
-echo "-------------------------------------------------" > /dev/tty
+echo -e "${GREEN}-------------------------------------------------${RESET}" > /dev/tty
+echo -e "${GREEN}Installation terminée. ✅${RESET}" > /dev/tty
+echo -e "${GREEN}-------------------------------------------------${RESET}" > /dev/tty
 
 exit 0
