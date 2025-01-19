@@ -1,4 +1,4 @@
 theme: jekyll-theme-cayman
 title: "kickstart.creeper.fr"
 description: "Linux Post-Install 🚀"
-show_downloads: true
+show_downloads: false
