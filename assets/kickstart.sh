@@ -76,6 +76,7 @@ BASE_PACKAGES=(
   "mtr-tiny"
   "whois"
   "nano"
+  "iperf3"
 )
 
 VIRTUALBOX_PACKAGES=(
