@@ -251,7 +251,6 @@ install_ssh_keys() {
   echo > /dev/tty
 }
 
-
 install_docker() {
   if command -v docker &> /dev/null; then
     echo -e "${YELLOW}Docker est déjà installé. Rien à faire.${RESET}" > /dev/tty
@@ -337,7 +336,6 @@ install_qemu_tools() {
   echo -e "${GREEN}==> Installation des Qemu Guest Tools... 🖥️${RESET}" > /dev/tty
   $PKG_MANAGER update
   $PKG_MANAGER install -y "${QEMU_PACKAGES[@]}"
-
   echo -e "${GREEN}==> Qemu Guest Tools installés et spice-vdagent activé.${RESET}" > /dev/tty
   echo > /dev/tty
 }
@@ -371,6 +369,24 @@ EOF
   sudo -u app bash -c "cd '$WATCHTOWER_DIR' && docker compose up -d"
 
   echo -e "${GREEN}==> Watchtower déployé dans ${WATCHTOWER_DIR}.${RESET}" > /dev/tty
+  echo > /dev/tty
+}
+
+install_speedtest() {
+  echo -e "${GREEN}==> Installation de Speedtest (Ookla)... 🚀${RESET}" > /dev/tty
+
+  # on s'assure que curl est présent (au cas où l'utilisateur n'a pas fait la maj)
+  $PKG_MANAGER update
+  $PKG_MANAGER install -y curl
+
+  # Script de repo Speedtest
+  curl -s https://packagecloud.io/install/repositories/ookla/speedtest-cli/script.deb.sh | bash
+
+  # Installation du package speedtest
+  $PKG_MANAGER update
+  $PKG_MANAGER install -y speedtest
+
+  echo -e "${GREEN}==> Speedtest (Ookla) est installé.${RESET}" > /dev/tty
   echo > /dev/tty
 }
 
@@ -453,6 +469,12 @@ if [[ "$CHOICE_DOCKER" == "yes" && "$CHOICE_USER" == "yes" ]]; then
   fi
 fi
 
+if ask_yes_no "11. Installer Speedtest (Ookla) ?" "no"; then
+  CHOICE_SPEEDTEST="yes"
+else
+  CHOICE_SPEEDTEST="no"
+fi
+
 echo -e "${CYAN}-------------------------------------------------${RESET}" > /dev/tty
 echo -e "${CYAN}Démarrage de l'installation selon vos réponses...${RESET}" > /dev/tty
 echo -e "${CYAN}-------------------------------------------------${RESET}" > /dev/tty
@@ -499,14 +521,18 @@ if [[ "$CHOICE_WATCHTOWER" == "yes" ]]; then
   deploy_watchtower
 fi
 
+if [[ "$CHOICE_SPEEDTEST" == "yes" ]]; then
+  install_speedtest
+fi
+
 # FIN DU SCRIPT : si WireGuard = yes, on installe resolvconf
 if [[ "$CHOICE_WIREGUARD" == "yes" ]]; then
   install_wireguard_part2
 fi
 
-# Enfin, on propose de redémarrer la machine
+# Enfin, on propose de redémarrer la machine => par défaut = yes
 echo -e "${CYAN}-------------------------------------------------${RESET}" > /dev/tty
-if ask_yes_no "Souhaitez-vous redémarrer la machine maintenant ?" "no"; then
+if ask_yes_no "Souhaitez-vous redémarrer la machine maintenant ?" "yes"; then
   echo -e "${YELLOW}Redémarrage en cours...${RESET}" > /dev/tty
   reboot
 else
