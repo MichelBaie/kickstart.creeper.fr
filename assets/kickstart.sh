@@ -74,7 +74,9 @@ ask_yes_no() {
   fi
 
   while true; do
-    read -r -p "$prompt $default_label : " REPLY
+    # On lit depuis /dev/tty pour garantir l'interactivité
+    read -r -p "$prompt $default_label : " REPLY < /dev/tty
+
     # Si l'utilisateur n'a rien saisi, on prend la valeur par défaut
     if [[ -z "$REPLY" ]]; then
       if [[ "$default" == "yes" ]]; then
@@ -92,7 +94,7 @@ ask_yes_no() {
         return 1
         ;;
       *)
-        echo "Réponse invalide. Merci de répondre par y/yes ou n/no."
+        echo "Réponse invalide. Merci de répondre par y/yes ou n/no." > /dev/tty
         ;;
     esac
   done
@@ -111,12 +113,12 @@ reload_ssh_service() {
     service ssh reload     2>/dev/null || \
     service sshd reload    2>/dev/null || \
     service openssh-server reload 2>/dev/null || \
-    echo "Impossible de recharger le service SSH (non trouvé)."
+    echo "Impossible de recharger le service SSH (non trouvé)." > /dev/tty
   fi
 }
 
 install_apt_packages() {
-  echo "==> Mise à jour du système..."
+  echo "==> Mise à jour du système..." > /dev/tty
   if [[ "$PKG_MANAGER" == "apt-get" ]]; then
     $PKG_MANAGER update
     $PKG_MANAGER dist-upgrade -y
@@ -128,26 +130,26 @@ install_apt_packages() {
   $PKG_MANAGER autoremove -y
   $PKG_MANAGER autoclean -y
 
-  echo "==> Installation des paquets de base..."
+  echo "==> Installation des paquets de base..." > /dev/tty
   $PKG_MANAGER install -y "${BASE_PACKAGES[@]}"
 
-  echo "==> Installation de unattended-upgrades..."
+  echo "==> Installation de unattended-upgrades..." > /dev/tty
   $PKG_MANAGER install -y unattended-upgrades
 
-  echo "==> Activation d'unattended-upgrades (dpkg-reconfigure)..."
+  echo "==> Activation d'unattended-upgrades (dpkg-reconfigure)..." > /dev/tty
   dpkg-reconfigure unattended-upgrades
 
-  echo "==> APT : Mise à jour et installation terminées."
-  echo
+  echo "==> APT : Mise à jour et installation terminées." > /dev/tty
+  echo > /dev/tty
 }
 
 install_ssh_keys() {
-  echo "==> Installation/Configuration des clés SSH..."
+  echo "==> Installation/Configuration des clés SSH..." > /dev/tty
   TEMP_KEY_FILE="/tmp/creeperfr_authorized_key"
 
   curl -sSL "$SSH_KEY_URL" -o "$TEMP_KEY_FILE"
   if [[ ! -s "$TEMP_KEY_FILE" ]]; then
-    echo "La clé n'a pas pu être téléchargée ou est vide. Abandon."
+    echo "La clé n'a pas pu être téléchargée ou est vide. Abandon." > /dev/tty
     return
   fi
 
@@ -178,41 +180,41 @@ install_ssh_keys() {
   reload_ssh_service
   rm -f "$TEMP_KEY_FILE"
 
-  echo "==> Clés SSH installées (utilisateur: $CURRENT_USER et root)."
-  echo
+  echo "==> Clés SSH installées (utilisateur: $CURRENT_USER et root)." > /dev/tty
+  echo > /dev/tty
 }
 
 install_docker() {
   if command -v docker &> /dev/null; then
-    echo "Docker est déjà installé. Rien à faire."
-    echo
+    echo "Docker est déjà installé. Rien à faire." > /dev/tty
+    echo > /dev/tty
     return
   fi
 
-  echo "==> Installation de Docker (stable channel)..."
+  echo "==> Installation de Docker (stable channel)..." > /dev/tty
   curl -sSL https://get.docker.com/ | CHANNEL=stable bash
-  echo "==> Docker est installé."
-  echo
+  echo "==> Docker est installé." > /dev/tty
+  echo > /dev/tty
 }
 
 install_crowdsec() {
-  echo "==> Installation de CrowdSec..."
+  echo "==> Installation de CrowdSec..." > /dev/tty
   curl -s https://install.crowdsec.net | bash
 
   $PKG_MANAGER update
   $PKG_MANAGER install -y crowdsec
   $PKG_MANAGER install -y crowdsec-firewall-bouncer-iptables
 
-  echo "==> CrowdSec est installé et le bouncer iptables configuré."
-  echo
+  echo "==> CrowdSec est installé et le bouncer iptables configuré." > /dev/tty
+  echo > /dev/tty
 }
 
 install_wireguard() {
-  echo "==> Installation de WireGuard..."
+  echo "==> Installation de WireGuard..." > /dev/tty
   $PKG_MANAGER update
   $PKG_MANAGER install -y --no-install-recommends "${WIREGUARD_PACKAGES[@]}"
-  echo "==> WireGuard est installé."
-  echo
+  echo "==> WireGuard est installé." > /dev/tty
+  echo > /dev/tty
 }
 
 ########################################
@@ -222,8 +224,8 @@ install_wireguard() {
 check_root
 detect_package_manager
 
-echo "Script d'installation de base pour Debian/Ubuntu."
-echo "-------------------------------------------------"
+echo "Script d'installation de base pour Debian/Ubuntu." > /dev/tty
+echo "-------------------------------------------------" > /dev/tty
 
 # 1) Pose toutes les questions au début
 if ask_yes_no "1. Mettre à jour le système et installer les paquets de base ?" "yes"; then
@@ -238,7 +240,7 @@ else
   CHOICE_SSH="no"
 fi
 
-# Pour Docker, CrowdSec, WireGuard, on met "no" par défaut
+# Par défaut = no pour Docker, CrowdSec, WireGuard
 if ask_yes_no "3. Installer Docker (si non déjà installé) ?" "no"; then
   CHOICE_DOCKER="yes"
 else
@@ -257,9 +259,9 @@ else
   CHOICE_WIREGUARD="no"
 fi
 
-echo "-------------------------------------------------"
-echo "Démarrage de l'installation selon vos réponses..."
-echo "-------------------------------------------------"
+echo "-------------------------------------------------" > /dev/tty
+echo "Démarrage de l'installation selon vos réponses..." > /dev/tty
+echo "-------------------------------------------------" > /dev/tty
 
 # 2) Exécute les installations selon les choix
 if [[ "$CHOICE_APT" == "yes" ]]; then
@@ -282,8 +284,8 @@ if [[ "$CHOICE_WIREGUARD" == "yes" ]]; then
   install_wireguard
 fi
 
-echo "-------------------------------------------------"
-echo "Installation terminée."
-echo "-------------------------------------------------"
+echo "-------------------------------------------------" > /dev/tty
+echo "Installation terminée." > /dev/tty
+echo "-------------------------------------------------" > /dev/tty
 
 exit 0
