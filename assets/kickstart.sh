@@ -9,7 +9,6 @@
 #             STYLISME / COULEURS      #
 ########################################
 
-# Séquences ANSI pour la couleur
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -18,17 +17,18 @@ CYAN='\033[0;36m'
 BOLD='\033[1m'
 RESET='\033[0m'
 
-# Petite fonction pour effacer l'écran et afficher la bannière ASCII
 print_banner() {
   clear
-
-  # Couleur et style en vert gras
   echo -e "${GREEN}${BOLD}"
   cat << "EOF"
-   ____ ____ ____ ____ ____ ____ 
-  ||C |||R |||E |||E |||P |||E ||
-  ||__|||__|||__|||__|||__|||__||
-  |/__\|/__\|/__\|/__\|/__\|/__\|
+   _____                                __      
+  / ____|                              / _|     
+ | |     _ __ ___  ___ _ __   ___ _ __| |_ _ __ 
+ | |    | '__/ _ \/ _ \ '_ \ / _ \ '__|  _| '__|
+ | |____| | |  __/  __/ |_) |  __/ |_ | | | |   
+  \_____|_|  \___|\___| .__/ \___|_(_)|_| |_|   
+                      | |                       
+                      |_|                       
 EOF
   echo -e "${RESET}"
   echo -e "Bienvenue dans le script Kickstart de ${GREEN}Creeper${RESET} ! 🚀"
@@ -63,6 +63,9 @@ BASE_PACKAGES=(
   "zip"
   "unzip"
   "rsync"
+  "mtr-tiny"
+  "whois"
+  "nano"
 )
 
 WIREGUARD_PACKAGES=(
@@ -114,7 +117,6 @@ ask_yes_no() {
   fi
 
   while true; do
-    # On ajoute une petite couleur / émoji dans le prompt
     echo -en "${BLUE}${prompt}${RESET} $default_label : " > /dev/tty
     read -r REPLY < /dev/tty
     if [[ -z "$REPLY" ]]; then
@@ -337,13 +339,11 @@ EOF
 #             PROGRAMME MAIN           #
 ########################################
 
-# Affiche la bannière ASCII + clear
-print_banner
+print_banner  # Efface l'écran et affiche l'ASCII Art
 
 check_root
 detect_package_manager
 
-# Invitations colorées avec un petit style
 echo -e "${CYAN}Script d'installation de base pour Debian/Ubuntu.${RESET}" > /dev/tty
 echo -e "${CYAN}-------------------------------------------------${RESET}" > /dev/tty
 
