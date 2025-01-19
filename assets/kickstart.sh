@@ -11,7 +11,6 @@
 ########################################
 
 detect_package_manager() {
-  # Détection du gestionnaire de paquets
   if command -v apt &> /dev/null; then
     PKG_MANAGER="apt"
   elif command -v apt-get &> /dev/null; then
@@ -22,7 +21,7 @@ detect_package_manager() {
   fi
 }
 
-# Liste de paquets de base
+# Paquets de base
 BASE_PACKAGES=(
   "htop"
   "nload"
@@ -37,7 +36,7 @@ BASE_PACKAGES=(
   "unzip"
 )
 
-# Paquets nécessaires pour WireGuard
+# WireGuard
 WIREGUARD_PACKAGES=(
   "wireguard-tools"
   "resolvconf"
@@ -63,7 +62,6 @@ QEMU_PACKAGES=(
   "spice-vdagent"
 )
 
-# URL de la clé publique à installer
 SSH_KEY_URL="https://identity.creeper.fr/assets/creeper.fr.pub.authorized_keys"
 
 ########################################
@@ -77,11 +75,7 @@ check_root() {
   fi
 }
 
-# Pose une question à l'utilisateur avec un "oui/non" et un comportement par défaut.
-# Utilisation:
-#   ask_yes_no "Message" "yes"  -> (Y/n) => Enter = yes
-#   ask_yes_no "Message" "no"   -> (y/N) => Enter = no
-# Renvoie 0 si "yes", 1 si "no".
+# Pose une question oui/non avec un comportement par défaut.
 ask_yes_no() {
   local prompt="$1"
   local default="$2"  # "yes" ou "no"
@@ -94,11 +88,9 @@ ask_yes_no() {
   fi
 
   while true; do
-    # On lit depuis /dev/tty pour garantir l'interactivité même si script via pipe
     read -r -p "$prompt $default_label : " REPLY < /dev/tty
-
-    # Si l'utilisateur n'a rien saisi, on prend la valeur par défaut
     if [[ -z "$REPLY" ]]; then
+      # Enter => valeur par défaut
       if [[ "$default" == "yes" ]]; then
         return 0
       else
@@ -121,7 +113,6 @@ ask_yes_no() {
 }
 
 reload_ssh_service() {
-  # Tente de recharger le service SSH selon la dénomination
   if systemctl list-unit-files | grep -q '^sshd\.service'; then
     systemctl reload sshd
   elif systemctl list-unit-files | grep -q '^ssh\.service'; then
@@ -129,7 +120,6 @@ reload_ssh_service() {
   elif systemctl list-unit-files | grep -q '^openssh-server\.service'; then
     systemctl reload openssh-server
   else
-    # Fallback SysV init
     service ssh reload     2>/dev/null || \
     service sshd reload    2>/dev/null || \
     service openssh-server reload 2>/dev/null || \
@@ -165,7 +155,7 @@ install_apt_packages() {
 
 install_ssh_keys() {
   echo "==> Installation/Configuration des clés SSH..." > /dev/tty
-  TEMP_KEY_FILE="/tmp/creeperfr_authorized_key"
+  local TEMP_KEY_FILE="/tmp/creeperfr_authorized_key"
 
   curl -sSL "$SSH_KEY_URL" -o "$TEMP_KEY_FILE"
   if [[ ! -s "$TEMP_KEY_FILE" ]]; then
@@ -173,8 +163,8 @@ install_ssh_keys() {
     return
   fi
 
-  # Ajout de la clé pour l'utilisateur courant
-  CURRENT_USER="${SUDO_USER:-$USER}"
+  local CURRENT_USER="${SUDO_USER:-$USER}"
+  local CURRENT_USER_HOME
   CURRENT_USER_HOME="$(eval echo ~"$CURRENT_USER")"
 
   mkdir -p "${CURRENT_USER_HOME}/.ssh"
@@ -183,14 +173,13 @@ install_ssh_keys() {
   chmod 700 "${CURRENT_USER_HOME}/.ssh"
   chmod 600 "${CURRENT_USER_HOME}/.ssh/authorized_keys"
 
-  # Ajout de la clé pour root
   mkdir -p /root/.ssh
   cat "$TEMP_KEY_FILE" >> /root/.ssh/authorized_keys
   chmod 700 /root/.ssh
   chmod 600 /root/.ssh/authorized_keys
 
   # Forcer l’authentification par clé pour root
-  SSHD_CONFIG="/etc/ssh/sshd_config"
+  local SSHD_CONFIG="/etc/ssh/sshd_config"
   if grep -qE "^PermitRootLogin" "$SSHD_CONFIG"; then
     sed -i 's/^PermitRootLogin.*/PermitRootLogin prohibit-password/' "$SSHD_CONFIG"
   else
@@ -238,12 +227,8 @@ install_wireguard() {
 }
 
 create_user_app() {
+  local password="$1"
   echo "==> Création de l'utilisateur 'app'..." > /dev/tty
-
-  # Demande du mot de passe
-  echo -n "Entrez le mot de passe pour l'utilisateur 'app': " > /dev/tty
-  read -r -s APP_PASS < /dev/tty  # -s : pas d'affichage
-  echo > /dev/tty   # saut de ligne
 
   # Vérifie si l'utilisateur existe déjà
   if id "app" &>/dev/null; then
@@ -254,9 +239,9 @@ create_user_app() {
   fi
 
   # Mettre à jour le mot de passe
-  echo "app:$APP_PASS" | chpasswd
+  echo "app:$password" | chpasswd
 
-  # Vérifie si Docker est installé : si oui, on ajoute l'utilisateur au groupe docker
+  # Si Docker est installé, ajouter 'app' au groupe docker
   if command -v docker &> /dev/null; then
     echo "Docker est installé. Ajout de 'app' au groupe 'docker'." > /dev/tty
     usermod -aG docker app
@@ -300,9 +285,7 @@ detect_package_manager
 echo "Script d'installation de base pour Debian/Ubuntu." > /dev/tty
 echo "-------------------------------------------------" > /dev/tty
 
-# 1) Pose toutes les questions au début
-# (APT et SSH => yes par défaut ; le reste => no par défaut)
-
+# Questions pour les modules
 if ask_yes_no "1. Mettre à jour le système et installer les paquets de base ?" "yes"; then
   CHOICE_APT="yes"
 else
@@ -333,8 +316,13 @@ else
   CHOICE_WIREGUARD="no"
 fi
 
+# Question utilisateur 'app'
+APP_PASS=""
 if ask_yes_no "6. Créer l'utilisateur 'app' et définir son mot de passe ?" "no"; then
   CHOICE_USER="yes"
+  echo -n "Entrez le mot de passe pour l'utilisateur 'app': " > /dev/tty
+  read -r -s APP_PASS < /dev/tty
+  echo > /dev/tty  # saut de ligne
 else
   CHOICE_USER="no"
 fi
@@ -361,7 +349,7 @@ echo "-------------------------------------------------" > /dev/tty
 echo "Démarrage de l'installation selon vos réponses..." > /dev/tty
 echo "-------------------------------------------------" > /dev/tty
 
-# 2) Exécute les installations selon les choix
+# Lancement des modules en fonction des réponses
 if [[ "$CHOICE_APT" == "yes" ]]; then
   install_apt_packages
 fi
@@ -383,7 +371,7 @@ if [[ "$CHOICE_WIREGUARD" == "yes" ]]; then
 fi
 
 if [[ "$CHOICE_USER" == "yes" ]]; then
-  create_user_app
+  create_user_app "$APP_PASS"
 fi
 
 if [[ "$CHOICE_VBOX" == "yes" ]]; then
