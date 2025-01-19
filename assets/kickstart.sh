@@ -337,7 +337,6 @@ install_qemu_tools() {
   echo -e "${GREEN}==> Installation des Qemu Guest Tools... 🖥️${RESET}" > /dev/tty
   $PKG_MANAGER update
   $PKG_MANAGER install -y "${QEMU_PACKAGES[@]}"
-  systemctl enable spice-vdagent
 
   echo -e "${GREEN}==> Qemu Guest Tools installés et spice-vdagent activé.${RESET}" > /dev/tty
   echo > /dev/tty
