@@ -76,7 +76,7 @@ BASE_PACKAGES=(
   "mtr-tiny"
   "whois"
   "nano"
-  "iperf3"
+  "iperf3"    # on garde iperf3 ici
 )
 
 VIRTUALBOX_PACKAGES=(
@@ -175,11 +175,15 @@ install_apt_packages() {
   $PKG_MANAGER autoremove -y
   $PKG_MANAGER autoclean -y
 
+  # Préconfiguration pour iperf3 : on répond 'no' (false) à "iperf3/autostart_daemon"
+  # afin d'éviter toute question interactive
+  echo "iperf3 iperf3/autostart_daemon boolean false" | debconf-set-selections
+
   echo -e "${GREEN}==> Installation des paquets de base... 🗂️${RESET}" > /dev/tty
-  $PKG_MANAGER install -y "${BASE_PACKAGES[@]}"
+  DEBIAN_FRONTEND=noninteractive $PKG_MANAGER install -y "${BASE_PACKAGES[@]}"
 
   echo -e "${GREEN}==> Installation de unattended-upgrades... 🤖${RESET}" > /dev/tty
-  $PKG_MANAGER install -y unattended-upgrades
+  DEBIAN_FRONTEND=noninteractive $PKG_MANAGER install -y unattended-upgrades
 
   echo -e "${GREEN}==> Activation des unattended-upgrades...${RESET}" > /dev/tty
   dpkg-reconfigure -pmedium unattended-upgrades
